@@ -74,18 +74,12 @@ def entropy_threshold(img: np.ndarray) -> float:
 
     cumulative = np.cumsum(p)
     cumulative_bg_entropy = np.cumsum(-p * np.log2(p + np.finfo(float).eps))
-<<<<<<< HEAD
-    
-=======
-    # suppress invalid divide warnings in entropy calculation
->>>>>>> 14f9362 (PyTest Complete)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        fg_entropy = (
-            cumulative_bg_entropy[-1] - cumulative_bg_entropy
-        ) / (1 - cumulative + np.finfo(float).eps)
-        total_entropy = cumulative_bg_entropy + fg_entropy
+    fg_entropy = (
+        cumulative_bg_entropy[-1] - cumulative_bg_entropy
+    ) / (1 - cumulative + np.finfo(float).eps)
+    total_entropy = cumulative_bg_entropy + fg_entropy
     total_entropy = np.nan_to_num(total_entropy, nan=-np.inf)
-    t = int(np.argmax(total_entropy[:-1])) 
+    t = int(np.argmax(total_entropy[:-1]))  # ignore last bin
     return t / 255.0
 
 
@@ -124,7 +118,7 @@ def analyze_image(path: Path | str) -> dict:
     positive_count = measure_regions(binary)
 
     image_area = gray.size
-    density = round(positive_count / image_area, 6)
+    density = positive_count / image_area
 
     return {
         "filepath": str(path),
@@ -167,8 +161,7 @@ def _main() -> None:
     args = parser.parse_args()
 
     df = batch_analyze(args.paths, args.out)
-    # only show filepath, cell_count, density for CLI tests
-    print(df[["filepath", "cell_count", "density"]].to_string(index=False))
+    print(df.to_string(index=False))
 
 
 if __name__ == "__main__":
