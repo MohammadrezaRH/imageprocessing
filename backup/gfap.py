@@ -98,11 +98,9 @@ def entropy_threshold(img: np.ndarray) -> float:
     # Cumulative sums for efficiency
     cumulative = np.cumsum(p)
     cumulative_bg_entropy = np.cumsum(-p * np.log2(p + np.finfo(float).eps))
-    # suppress invalid divide warnings in entropy calculation
-    with np.errstate(divide='ignore', invalid='ignore'):
-        total_entropy = cumulative_bg_entropy + (
-            cumulative_bg_entropy[-1] - cumulative_bg_entropy
-        ) / (1 - cumulative + np.finfo(float).eps)
+    total_entropy = cumulative_bg_entropy + (
+        cumulative_bg_entropy[-1] - cumulative_bg_entropy
+    ) / (1 - cumulative + np.finfo(float).eps)
 
     # total_entropy contains NaNs where cumulative == 1; mask them
     total_entropy = np.nan_to_num(total_entropy, nan=-np.inf)
@@ -157,7 +155,7 @@ def analyze_image(path: Path | str) -> dict:
     binary = segment(processed, thresh)
     cell_count, positive_area = measure_regions(binary)
     image_area = gray.size
-    normalized_area_coverage = round(positive_area / image_area, 6)
+    normalized_area_coverage = positive_area / image_area
     return {
         "filepath": str(path),
         "cell_count": cell_count,

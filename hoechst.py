@@ -108,7 +108,7 @@ def analyze_image(path: Path | str) -> dict:
     final_mask, positive_count = filter_regions(binary)
 
     image_area = gray.size
-    cell_density = positive_count / image_area
+    cell_density = round(positive_count / image_area, 6)
     total_positive_pixels = int(final_mask.sum())
 
     return {

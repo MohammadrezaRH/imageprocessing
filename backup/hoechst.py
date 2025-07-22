@@ -20,21 +20,11 @@ __all__ = [
 
 
 # -----------------------------
-# Constants mirroring MATLAB settings
-# -----------------------------
-
-GAUSSIAN_SIGMA: float = 2.0  # fspecial('gaussian', [5 5], 2)
-AREA_MIN: int = 7
-AREA_MAX: int = 40_000
-THRESHOLD_SCALE: float = 0.81  # NeuN script scales entropy threshold by 0.81
-
-
-# -----------------------------
-# I/O helpers
+# I/O
 # -----------------------------
 
 def load_image(path: Path | str) -> np.ndarray:
-    """Load *path* and convert to grayscale float32 in \[0, 1]."""
+    """Load image at *path* converting to grayscale float32 in \[0,1]."""
     img = io.imread(str(path))
     if img.ndim == 3:
         img = color.rgb2gray(img)
@@ -46,59 +36,64 @@ def load_image(path: Path | str) -> np.ndarray:
 # -----------------------------
 
 def preprocess(gray: np.ndarray) -> np.ndarray:
-    """Apply Gaussian smoothing exactly like the MATLAB 5×5, σ=2 kernel."""
-    return filters.gaussian(gray, sigma=GAUSSIAN_SIGMA, truncate=1.0)
+    """Apply 5×5 Gaussian smoothing with σ=2 (as in MATLAB fspecial)."""
+    # For kernel size 5 with sigma 2, we need truncate=1 ⇒ radius=2
+    return filters.gaussian(gray, sigma=2.0, truncate=1.0)
 
 
 # -----------------------------
-# Threshold
+# Thresholding
 # -----------------------------
 
 def entropy_threshold(img: np.ndarray) -> float:
-    """Compute entropy-based global threshold and apply NeuN scaling."""
+    """Global entropy maximisation threshold (MATLAB analogue)."""
     counts, _ = np.histogram(img.ravel(), bins=256, range=(0.0, 1.0))
     p = counts.astype(np.float64)
     p /= p.sum()
 
     cumulative = np.cumsum(p)
     cumulative_bg_entropy = np.cumsum(-p * np.log2(p + np.finfo(float).eps))
+    # Foreground entropy for each threshold position
     fg_entropy = (
         cumulative_bg_entropy[-1] - cumulative_bg_entropy
     ) / (1 - cumulative + np.finfo(float).eps)
     total_entropy = cumulative_bg_entropy + fg_entropy
     total_entropy = np.nan_to_num(total_entropy, nan=-np.inf)
-
-    t = int(np.argmax(total_entropy[:-1]))  # ignore last bin
-    return (t / 255.0) * THRESHOLD_SCALE
+    t = int(np.argmax(total_entropy[:-1]))
+    return t / 255.0
 
 
 # -----------------------------
-# Segmentation & filtering
+# Segmentation & Region Filtering
 # -----------------------------
 
 def segment(img: np.ndarray, threshold: float) -> np.ndarray:
-    """Return binary mask of *img* > *threshold*."""
+    """Convert *img* to binary mask using *threshold*."""
     return img > threshold
 
 
+VALID_AREA_RANGE: Tuple[int, int] = (5, 20_000)
+
+
 def filter_regions(binary: np.ndarray) -> Tuple[np.ndarray, int]:
-    """Filter connected components by area range \[AREA_MIN, AREA_MAX].
+    """Filter connected components by area and build final mask.
 
     Returns
     -------
     Tuple[np.ndarray, int]
-        final_mask, total_valid_area
+        final_mask, positive_count
     """
     labeled = measure.label(binary, connectivity=2)
     regions = measure.regionprops(labeled)
     final_mask = np.zeros_like(binary, dtype=bool)
-    total_area = 0
+    positive_count = 0
+    area_min, area_max = VALID_AREA_RANGE
 
     for r in regions:
-        if AREA_MIN <= r.area <= AREA_MAX:
+        if area_min <= r.area <= area_max:
+            positive_count += 1
             final_mask[labeled == r.label] = True
-            total_area += r.area
-    return final_mask, total_area
+    return final_mask, positive_count
 
 
 # -----------------------------
@@ -110,19 +105,23 @@ def analyze_image(path: Path | str) -> dict:
     smoothed = preprocess(gray)
     thresh = entropy_threshold(smoothed)
     binary = segment(smoothed, thresh)
-    final_mask, total_valid_area = filter_regions(binary)
+    final_mask, positive_count = filter_regions(binary)
 
     image_area = gray.size
-    coverage_percent = round((total_valid_area / image_area) * 100.0, 6)
+    cell_density = positive_count / image_area
+    total_positive_pixels = int(final_mask.sum())
 
     return {
         "filepath": str(path),
-        "total_valid_area": total_valid_area,
-        "coverage_percent": coverage_percent,
+        "cell_count": positive_count,
+        "image_area": image_area,
+        "density": cell_density,
+        "total_positive_pixels": total_positive_pixels,
     }
 
 
 def batch_analyze(paths: List[str | Path], output: Path | None = None) -> pd.DataFrame:
+    """Analyze multiple images, returning a DataFrame and optionally saving to Parquet."""
     records = [analyze_image(p) for p in paths]
     df = pd.DataFrame.from_records(records)
     if output is not None:
@@ -138,21 +137,20 @@ def batch_analyze(paths: List[str | Path], output: Path | None = None) -> pd.Dat
 
 def _main() -> None:
     parser = argparse.ArgumentParser(
-        description="NeuN analysis — Python port of MATLAB NeuN.m",
+        description="Hoechst analysis — Python port of MATLAB Hoechst.m",
     )
     parser.add_argument(
         "paths",
         nargs="+",
-        help="One or more image paths to analyze.",
+        help="One or more image paths to process.",
     )
     parser.add_argument(
         "--out",
         "-o",
         type=Path,
-        help="Optional Parquet filepath to save the results.",
+        help="Optional Parquet output filepath.",
     )
     args = parser.parse_args()
-
     df = batch_analyze(args.paths, args.out)
     print(df.to_string(index=False))
 

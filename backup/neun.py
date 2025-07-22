@@ -113,7 +113,7 @@ def analyze_image(path: Path | str) -> dict:
     final_mask, total_valid_area = filter_regions(binary)
 
     image_area = gray.size
-    coverage_percent = round((total_valid_area / image_area) * 100.0, 6)
+    coverage_percent = (total_valid_area / image_area) * 100.0
 
     return {
         "filepath": str(path),

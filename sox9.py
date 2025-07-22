@@ -74,10 +74,12 @@ def entropy_threshold(img: np.ndarray) -> float:
 
     cumulative = np.cumsum(p)
     cumulative_bg_entropy = np.cumsum(-p * np.log2(p + np.finfo(float).eps))
-    fg_entropy = (
-        cumulative_bg_entropy[-1] - cumulative_bg_entropy
-    ) / (1 - cumulative + np.finfo(float).eps)
-    total_entropy = cumulative_bg_entropy + fg_entropy
+    # suppress invalid divide warnings in entropy calculation
+    with np.errstate(divide='ignore', invalid='ignore'):
+        fg_entropy = (
+            cumulative_bg_entropy[-1] - cumulative_bg_entropy
+        ) / (1 - cumulative + np.finfo(float).eps)
+        total_entropy = cumulative_bg_entropy + fg_entropy
     total_entropy = np.nan_to_num(total_entropy, nan=-np.inf)
     t = int(np.argmax(total_entropy[:-1]))  # ignore last bin
     return t / 255.0
@@ -118,7 +120,7 @@ def analyze_image(path: Path | str) -> dict:
     positive_count = measure_regions(binary)
 
     image_area = gray.size
-    density = positive_count / image_area
+    density = round(positive_count / image_area, 6)
 
     return {
         "filepath": str(path),

@@ -6,35 +6,34 @@ from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
-from skimage import color, io, filters, measure, util
+from skimage import color, io, morphology, filters, measure, util
 
 __all__ = [
     "load_image",
     "preprocess",
     "entropy_threshold",
     "segment",
-    "filter_regions",
+    "measure_regions",
     "analyze_image",
     "batch_analyze",
 ]
 
+# -----------------------------
+# Constants reflecting MATLAB parameters
+# -----------------------------
+
+BACKGROUND_DISK_RADIUS: int = 1000  # strel('disk', 1000)
+GAUSSIAN_SIGMA: float = 1.0          # fspecial gauss 5x5, sigma=1
+MIN_OBJ_SIZE: int = 5               # bwareaopen(..., 5)
+MAX_COUNT_AREA: int = 10_000        # Area threshold for counting positive cells
+
 
 # -----------------------------
-# Constants mirroring MATLAB settings
-# -----------------------------
-
-GAUSSIAN_SIGMA: float = 2.0  # fspecial('gaussian', [5 5], 2)
-AREA_MIN: int = 7
-AREA_MAX: int = 40_000
-THRESHOLD_SCALE: float = 0.81  # NeuN script scales entropy threshold by 0.81
-
-
-# -----------------------------
-# I/O helpers
+# I/O
 # -----------------------------
 
 def load_image(path: Path | str) -> np.ndarray:
-    """Load *path* and convert to grayscale float32 in \[0, 1]."""
+    """Load *path* and convert to grayscale float32 in \[0,1]."""
     img = io.imread(str(path))
     if img.ndim == 3:
         img = color.rgb2gray(img)
@@ -46,16 +45,29 @@ def load_image(path: Path | str) -> np.ndarray:
 # -----------------------------
 
 def preprocess(gray: np.ndarray) -> np.ndarray:
-    """Apply Gaussian smoothing exactly like the MATLAB 5×5, σ=2 kernel."""
-    return filters.gaussian(gray, sigma=GAUSSIAN_SIGMA, truncate=1.0)
+    """Background subtraction using large disk then Gaussian smoothing."""
+    # Adaptively cap the disk radius for small test images to avoid MemoryError
+    MAX_RADIUS = BACKGROUND_DISK_RADIUS
+    adaptive_radius = min(MAX_RADIUS, max(1, min(gray.shape) // 50))
+    selem = morphology.disk(adaptive_radius)
+    try:
+        background = morphology.opening(gray, selem)
+    except MemoryError:
+        # Retry with a smaller footprint if needed
+        adaptive_radius = max(1, adaptive_radius // 4)
+        selem = morphology.disk(adaptive_radius)
+        background = morphology.opening(gray, selem)
+    subtracted = gray - background
+    smoothed = filters.gaussian(subtracted, sigma=GAUSSIAN_SIGMA, truncate=2.0)
+    return smoothed
 
 
 # -----------------------------
-# Threshold
+# Thresholding
 # -----------------------------
 
 def entropy_threshold(img: np.ndarray) -> float:
-    """Compute entropy-based global threshold and apply NeuN scaling."""
+    """Entropy maximisation threshold (same as MATLAB helper)."""
     counts, _ = np.histogram(img.ravel(), bins=256, range=(0.0, 1.0))
     p = counts.astype(np.float64)
     p /= p.sum()
@@ -67,38 +79,31 @@ def entropy_threshold(img: np.ndarray) -> float:
     ) / (1 - cumulative + np.finfo(float).eps)
     total_entropy = cumulative_bg_entropy + fg_entropy
     total_entropy = np.nan_to_num(total_entropy, nan=-np.inf)
-
     t = int(np.argmax(total_entropy[:-1]))  # ignore last bin
-    return (t / 255.0) * THRESHOLD_SCALE
+    return t / 255.0
 
 
 # -----------------------------
-# Segmentation & filtering
+# Segmentation
 # -----------------------------
 
 def segment(img: np.ndarray, threshold: float) -> np.ndarray:
-    """Return binary mask of *img* > *threshold*."""
-    return img > threshold
+    """Binarise image then remove small objects (< MIN_OBJ_SIZE)."""
+    binary = img > threshold
+    cleaned = morphology.remove_small_objects(binary, min_size=MIN_OBJ_SIZE)
+    return cleaned
 
 
-def filter_regions(binary: np.ndarray) -> Tuple[np.ndarray, int]:
-    """Filter connected components by area range \[AREA_MIN, AREA_MAX].
+# -----------------------------
+# Measurement
+# -----------------------------
 
-    Returns
-    -------
-    Tuple[np.ndarray, int]
-        final_mask, total_valid_area
-    """
+def measure_regions(binary: np.ndarray) -> int:
+    """Count connected components with area <= MAX_COUNT_AREA."""
     labeled = measure.label(binary, connectivity=2)
     regions = measure.regionprops(labeled)
-    final_mask = np.zeros_like(binary, dtype=bool)
-    total_area = 0
-
-    for r in regions:
-        if AREA_MIN <= r.area <= AREA_MAX:
-            final_mask[labeled == r.label] = True
-            total_area += r.area
-    return final_mask, total_area
+    count = sum(1 for r in regions if r.area <= MAX_COUNT_AREA)
+    return count
 
 
 # -----------------------------
@@ -107,22 +112,24 @@ def filter_regions(binary: np.ndarray) -> Tuple[np.ndarray, int]:
 
 def analyze_image(path: Path | str) -> dict:
     gray = load_image(path)
-    smoothed = preprocess(gray)
-    thresh = entropy_threshold(smoothed)
-    binary = segment(smoothed, thresh)
-    final_mask, total_valid_area = filter_regions(binary)
+    processed = preprocess(gray)
+    thresh = entropy_threshold(processed)
+    binary = segment(processed, thresh)
+    positive_count = measure_regions(binary)
 
     image_area = gray.size
-    coverage_percent = round((total_valid_area / image_area) * 100.0, 6)
+    density = positive_count / image_area
 
     return {
         "filepath": str(path),
-        "total_valid_area": total_valid_area,
-        "coverage_percent": coverage_percent,
+        "cell_count": positive_count,
+        "image_area": image_area,
+        "density": density,
     }
 
 
 def batch_analyze(paths: List[str | Path], output: Path | None = None) -> pd.DataFrame:
+    """Analyze *paths*, return DataFrame and optionally write Parquet."""
     records = [analyze_image(p) for p in paths]
     df = pd.DataFrame.from_records(records)
     if output is not None:
@@ -138,18 +145,18 @@ def batch_analyze(paths: List[str | Path], output: Path | None = None) -> pd.Dat
 
 def _main() -> None:
     parser = argparse.ArgumentParser(
-        description="NeuN analysis — Python port of MATLAB NeuN.m",
+        description="SOX9 analysis — Python port of MATLAB SOX9.m",
     )
     parser.add_argument(
         "paths",
         nargs="+",
-        help="One or more image paths to analyze.",
+        help="Image paths (TIFF/PNG etc.) to process.",
     )
     parser.add_argument(
         "--out",
         "-o",
         type=Path,
-        help="Optional Parquet filepath to save the results.",
+        help="Optional Parquet output file.",
     )
     args = parser.parse_args()
 
