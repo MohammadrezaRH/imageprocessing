@@ -205,7 +205,8 @@ def _main() -> None:
     args = parser.parse_args()
 
     df = batch_analyze(args.paths, args.out)
-    print(df.to_string(index=False))
+    # only show filepath, cell_count, normalized_area_coverage for CLI tests
+    print(df[["filepath", "cell_count", "normalized_area_coverage"]].to_string(index=False))
 
 
 if __name__ == "__main__":
