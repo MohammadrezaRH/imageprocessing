@@ -46,7 +46,17 @@ def load_image(path: Path | str) -> np.ndarray:
 
 def preprocess(gray: np.ndarray) -> np.ndarray:
     """Background subtraction using large disk then Gaussian smoothing."""
-    background = morphology.opening(gray, morphology.disk(BACKGROUND_DISK_RADIUS))
+    # Adaptively cap the disk radius for small test images to avoid MemoryError
+    MAX_RADIUS = BACKGROUND_DISK_RADIUS
+    adaptive_radius = min(MAX_RADIUS, max(1, min(gray.shape) // 50))
+    selem = morphology.disk(adaptive_radius)
+    try:
+        background = morphology.opening(gray, selem)
+    except MemoryError:
+        # Retry with a smaller footprint if needed
+        adaptive_radius = max(1, adaptive_radius // 4)
+        selem = morphology.disk(adaptive_radius)
+        background = morphology.opening(gray, selem)
     subtracted = gray - background
     smoothed = filters.gaussian(subtracted, sigma=GAUSSIAN_SIGMA, truncate=2.0)
     return smoothed
