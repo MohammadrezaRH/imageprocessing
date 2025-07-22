@@ -191,6 +191,10 @@ def _main() -> None:
     args = parser.parse_args()
 
     df = batch_analyze(args.paths, args.out)
+<<<<<<< HEAD
+=======
+    # only show filepath, cell_count, normalized_area_coverage for CLI tests
+>>>>>>> f40b84e (CLI Tests Passed)
     print(df[["filepath", "cell_count", "normalized_area_coverage"]].to_string(index=False))
 
 
