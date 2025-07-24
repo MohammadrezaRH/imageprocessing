@@ -4,16 +4,12 @@ Setup script for pip installation of the cell analysis pipelines.
 from pathlib import Path
 from setuptools import setup
 
-# read the long description from README.md
 this_directory = Path(__file__).parent
-long_description = (this_directory / "README.md").read_text()
 
 setup(
     name="cell-analysis-pipelines",
     version="0.1.0",
     description="Python port of MATLAB cell analysis pipelines (GFAP, Hoechst, NeuN, SOX9)",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
     author="Your Name",
     author_email="you@example.com",
     py_modules=["gfap", "hoechst", "neun", "sox9", "run_sample_images"],
