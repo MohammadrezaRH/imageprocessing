@@ -1,6 +1,0 @@
-[console_scripts]
-gfap = gfap:_main
-hoechst = hoechst:_main
-neun = neun:_main
-run-sample-images = run_sample_images:main
-sox9 = sox9:_main
