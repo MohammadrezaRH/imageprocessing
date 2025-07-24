@@ -1,6 +1,7 @@
 """
 Setup script for pip installation of the cell analysis pipelines.
 """
+
 from pathlib import Path
 from setuptools import setup
 
@@ -10,8 +11,9 @@ setup(
     name="cell-analysis-pipelines",
     version="0.1.0",
     description="Python port of MATLAB cell analysis pipelines (GFAP, Hoechst, NeuN, SOX9)",
-    author="Your Name",
-    author_email="you@example.com",
+    author="Reza Rahmani",
+    author_email="mrahmanimanesh@uvic.ca",
+    license="MIT",
     py_modules=["gfap", "hoechst", "neun", "sox9", "run_sample_images"],
     install_requires=[
         "numpy>=1.18.0",
@@ -30,7 +32,6 @@ setup(
     python_requires=">=3.7",
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-) 
+)
