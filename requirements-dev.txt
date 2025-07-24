@@ -1,0 +1,7 @@
+﻿-r requirements.txt
+
+# Dev tools
+pytest
+mypy
+flake8
+black
