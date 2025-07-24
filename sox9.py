@@ -23,7 +23,7 @@ __all__ = [
 # -----------------------------
 
 BACKGROUND_DISK_RADIUS: int = 1000  # strel('disk', 1000)
-GAUSSIAN_SIGMA: float = 1.0          # fspecial gauss 5x5, sigma=1
+GAUSSIAN_SIGMA: float = 1.0         # fspecial gauss 5x5, sigma=1
 MIN_OBJ_SIZE: int = 5               # bwareaopen(..., 5)
 MAX_COUNT_AREA: int = 10_000        # Area threshold for counting positive cells
 
@@ -33,7 +33,7 @@ MAX_COUNT_AREA: int = 10_000        # Area threshold for counting positive cells
 # -----------------------------
 
 def load_image(path: Path | str) -> np.ndarray:
-    """Load *path* and convert to grayscale float32 in \[0,1]."""
+    """Load *path* and convert to grayscale float32 in [0,1]."""
     img = io.imread(str(path))
     if img.ndim == 3:
         img = color.rgb2gray(img)
@@ -46,14 +46,12 @@ def load_image(path: Path | str) -> np.ndarray:
 
 def preprocess(gray: np.ndarray) -> np.ndarray:
     """Background subtraction using large disk then Gaussian smoothing."""
-    # Adaptively cap the disk radius for small test images to avoid MemoryError
     MAX_RADIUS = BACKGROUND_DISK_RADIUS
     adaptive_radius = min(MAX_RADIUS, max(1, min(gray.shape) // 50))
     selem = morphology.disk(adaptive_radius)
     try:
         background = morphology.opening(gray, selem)
     except MemoryError:
-        # Retry with a smaller footprint if needed
         adaptive_radius = max(1, adaptive_radius // 4)
         selem = morphology.disk(adaptive_radius)
         background = morphology.opening(gray, selem)
@@ -74,18 +72,15 @@ def entropy_threshold(img: np.ndarray) -> float:
 
     cumulative = np.cumsum(p)
     cumulative_bg_entropy = np.cumsum(-p * np.log2(p + np.finfo(float).eps))
-<<<<<<< HEAD
-    
-=======
-    # suppress invalid divide warnings in entropy calculation
->>>>>>> 14f9362 (PyTest Complete)
+
     with np.errstate(divide='ignore', invalid='ignore'):
         fg_entropy = (
             cumulative_bg_entropy[-1] - cumulative_bg_entropy
         ) / (1 - cumulative + np.finfo(float).eps)
         total_entropy = cumulative_bg_entropy + fg_entropy
+
     total_entropy = np.nan_to_num(total_entropy, nan=-np.inf)
-    t = int(np.argmax(total_entropy[:-1])) 
+    t = int(np.argmax(total_entropy[:-1]))
     return t / 255.0
 
 
@@ -167,9 +162,8 @@ def _main() -> None:
     args = parser.parse_args()
 
     df = batch_analyze(args.paths, args.out)
-    # only show filepath, cell_count, density for CLI tests
     print(df[["filepath", "cell_count", "density"]].to_string(index=False))
 
 
 if __name__ == "__main__":
-    _main() 
+    _main()

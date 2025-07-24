@@ -27,7 +27,6 @@ def load_image(path: Path | str) -> np.ndarray:
     image = io.imread(str(path))
     if image.ndim == 3:
         image = color.rgb2gray(image)
-    # Convert to float in [0, 1]
     image = util.img_as_float32(image)
     return image
 
@@ -36,20 +35,7 @@ def load_image(path: Path | str) -> np.ndarray:
 # -----------------------------
 
 def preprocess(gray: np.ndarray) -> np.ndarray:
-    """Replicate MATLAB background subtraction + Gaussian smoothing.
-
-    1. Morphological opening with a (possibly down-scaled) disk.
-    2. Subtract background.
-    3. 5 × 5 Gaussian (σ = 1).
-
-    Notes
-    -----
-    The original MATLAB script hard-codes a 170-pixel radius.  SciPy’s grey
-    morphology allocates memory proportional to *footprint area × image size*,
-    so on tiny 512 × 512 demo images this raises ``MemoryError``.  We therefore
-    shrink the disk when the image is small, leaving behaviour unchanged for
-    real, high-resolution data.
-    """
+    """Replicate MATLAB background subtraction + Gaussian smoothing."""
     MAX_RADIUS = 170
     adaptive_radius = min(MAX_RADIUS, max(1, min(gray.shape) // 50))
 
@@ -70,28 +56,15 @@ def preprocess(gray: np.ndarray) -> np.ndarray:
 # -----------------------------
 
 def entropy_threshold(img: np.ndarray) -> float:
-    """Entropy-based threshold identical to the MATLAB *entropyThreshold* helper.
-
-    Parameters
-    ----------
-    img
-        Pre-processed image in [0, 1].
-
-    Returns
-    -------
-    float
-        Global threshold in [0, 1].
-    """
+    """Entropy-based threshold identical to the MATLAB *entropyThreshold* helper."""
     counts, bin_edges = np.histogram(img.ravel(), bins=256, range=(0.0, 1.0))
     p = counts.astype(np.float64)
     p /= p.sum()
 
     cumulative = np.cumsum(p)
     cumulative_bg_entropy = np.cumsum(-p * np.log2(p + np.finfo(float).eps))
-<<<<<<< HEAD
-=======
+
     # suppress invalid divide warnings in entropy calculation
->>>>>>> 14f9362 (PyTest Complete)
     with np.errstate(divide='ignore', invalid='ignore'):
         total_entropy = cumulative_bg_entropy + (
             cumulative_bg_entropy[-1] - cumulative_bg_entropy
@@ -108,21 +81,14 @@ def entropy_threshold(img: np.ndarray) -> float:
 
 def segment(img: np.ndarray, threshold: float) -> np.ndarray:
     """Binarise *img* given *threshold* (float in [0,1])."""
-    binary = img > threshold
-    return binary
+    return img > threshold
 
 # -----------------------------
 # Measurement
 # -----------------------------
 
 def measure_regions(binary: np.ndarray) -> Tuple[int, int]:
-    """Count and accumulate area for regions with area ≤ 10000 pixels.
-
-    Returns
-    -------
-    Tuple[int, int]
-        (count, area_sum)
-    """
+    """Count and accumulate area for regions with area ≤ 10000 pixels."""
     labeled = measure.label(binary, connectivity=2)
     regions = measure.regionprops(labeled)
     count = 0
@@ -155,11 +121,7 @@ def analyze_image(path: Path | str) -> dict:
     }
 
 def batch_analyze(paths: List[str | Path], output: Path | None = None) -> pd.DataFrame:
-    """Analyze *paths* and return a `pandas.DataFrame`.
-
-    If *output* is given, persist the DataFrame to a Parquet file for fast
-    downstream analytics.
-    """
+    """Analyze *paths* and return a `pandas.DataFrame`. Optionally saves to Parquet."""
     records = [analyze_image(p) for p in paths]
     df = pd.DataFrame.from_records(records)
     if output is not None:
@@ -189,14 +151,10 @@ def _main() -> None:
         help="Optional Parquet output filepath.",
     )
     args = parser.parse_args()
-
     df = batch_analyze(args.paths, args.out)
-<<<<<<< HEAD
-=======
-    # only show filepath, cell_count, normalized_area_coverage for CLI tests
->>>>>>> f40b84e (CLI Tests Passed)
-    print(df[["filepath", "cell_count", "normalized_area_coverage"]].to_string(index=False))
 
+    # only show filepath, cell_count, normalized_area_coverage for CLI tests
+    print(df[["filepath", "cell_count", "normalized_area_coverage"]].to_string(index=False))
 
 if __name__ == "__main__":
     _main()
