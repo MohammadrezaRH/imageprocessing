@@ -1,7 +1,26 @@
-﻿-r requirements.txt
+# Base project dependencies
+-r requirements.txt
 
-# Dev tools
+# Testing
 pytest
+pytest-cov
+pytest-benchmark
+
+# Type checking
 mypy
-flake8
-black
+
+# Linting / Formatting
+ruff
+
+# Packaging & release tools
+build
+twine
+
+# Security scanning
+bandit
+
+# Cross-version testing
+tox
+
+# Data engine
+pyarrow
