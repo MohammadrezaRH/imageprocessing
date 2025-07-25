@@ -12,8 +12,8 @@ Originally developed for neuroscience research, these pipelines are adaptable to
 1.1 Installation
 
 Clone the repository:
-    git clone https://github.com/MohammadrezaRH/imageprocessing.git
-    cd imageprocessing
+   git clone https://github.com/MohammadrezaRH/neuroimage-quantification.git
+   cd neuroimage-quantification
 
 Create and activate a virtual environment (recommended):
     python -m venv venv
