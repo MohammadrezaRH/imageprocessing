@@ -8,78 +8,100 @@ Originally developed for neuroscience research, these pipelines are adaptable to
 ---------------------------------------------------------------------
 1. Setup and Usage
 ---------------------------------------------------------------------
+---
 
-1.1 Installation
+## 1. Installation
 
-Clone the repository:
-   git clone https://github.com/MohammadrezaRH/neuroimage-quantification.git
-   cd neuroimage-quantification
+### 1.1 Clone the repository
 
-Create and activate a virtual environment (recommended):
-    python -m venv venv
+```bash
+git clone https://github.com/MohammadrezaRH/neuroimage-quantification.git
+cd neuroimage-quantification
+```
 
-    # On Windows:
-    .\venv\Scripts\activate
+### 1.2 (Optional but recommended) Create and activate a virtual environment
 
-    # On Unix/macOS:
-    source venv/bin/activate
+```bash
+# Create the environment
+py -m venv venv
 
-Install the package and its dependencies:
-    pip install -e .
+# Activate it (PowerShell)
+.\venv\Scripts\Activate.ps1
+```
 
----------------------------------------------------------------------
-2. Running the Analysis
----------------------------------------------------------------------
+If you see a script execution error, run this first:
 
-This package provides four command-line tools:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+```
 
-    gfap       - Quantify GFAP signal (astrocyte reactivity)
-    hoechst    - Count total cells using Hoechst stain
-    neun       - Count neurons using NeuN stain
-    sox9       - Count astrocyte nuclei using SOX9
+### 1.3 Install dependencies
 
-Example usage:
+```bash
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
 
-    gfap path/to/image.tiff
-    hoechst image1.tiff image2.tiff image3.tiff
-    neun --out results.parquet image*.tiff
-    run-sample-images
+---
 
----------------------------------------------------------------------
-3. Output Format
----------------------------------------------------------------------
+## 2. Running the Pipelines
 
-Each pipeline returns a structured table. Columns vary by stain:
+Each stain has its own CLI command:
 
-GFAP:
-    filepath, cell_count, positive_area, image_area, normalized_area_coverage
+```bash
+# GFAP example
+gfap sample_images/cells.png
 
-Hoechst:
-    filepath, cell_count, image_area, density
+# Hoechst example
+hoechst sample_images/coins.png
 
-NeuN:
-    filepath, total_valid_area, image_area, coverage_percent
+# NeuN example
+neun sample_images/page.png
 
-SOX9:
-    filepath, cell_count, image_area, density
+# SOX9 example
+sox9 sample_images/rocket.png
+```
 
-Output can be:
-    - Printed to the console
-    - Saved to Parquet (--out)
-    - Loaded into pandas, Power BI, Dask, etc.
+You can provide multiple images or use wildcards (`*.png`). Output is printed to the console or can be saved using `--out`.
 
----------------------------------------------------------------------
-4. Running Tests
----------------------------------------------------------------------
+```bash
+sox9 --out sox9_results.parquet sample_images/*.png
+```
 
-Run the full test suite:
-    pytest
+---
 
-Run a specific test:
-    pytest tests/test_pipelines.py
+## 3. Running All Pipelines on Sample Images
 
-Run with verbose output:
-    pytest -v
+To run all pipelines on default sample images (using `skimage.data`), run:
+
+```bash
+py run_sample_images.py
+```
+
+This executes all four analysis pipelines and prints their output tables.
+
+---
+
+## 4. Output Format
+
+Each pipeline returns a table with standardized columns:
+
+- **GFAP**: filepath, cell_count, normalized_area_coverage  
+- **Hoechst**: filepath, cell_count, density  
+- **NeuN**: filepath, total_valid_area, coverage_percent  
+- **SOX9**: filepath, cell_count, density
+
+---
+
+## 5. Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Verbose mode
+pytest -v
+```
 
 ---------------------------------------------------------------------
 5. Tech Stack
